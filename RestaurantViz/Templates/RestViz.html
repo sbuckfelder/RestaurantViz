@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<title> Restaurant Visualization </title>
+	<style type = “text/css”>
+		canvas {border: 2px solid black;}
+	</style>
+</head>
+
+<body onload="drawViz()">
+
+<h1>Restaurant Visualization Tool</h1>
+<hr>
+
+<canvas id="myCanvas"></canvas>
+
+<form action="demo_form.asp" method="get">
+Distance: <input type="range" name="distValue" id = "distValue" min="1" max="5">
+Price: <input type="range" name="priceValue" id = "priceValue" min="1" max="5">
+Phrase: <input type="range" name="phraseValue" id = "phraseValue" min="1" max="5">
+<button type="button" onclick="drawViz();"> Update Visual</button>
+</form>
+<p> Powered By <font color =#0cbadf>FourSquare</font> </p>
+<hr>
+<p> This is a simple web application that uses a seed restaurant (Currently hard coded as Xi'an Famous Foods, NYC St. Marks) and location to find other similar restaurants.  The slide tools allow the user to alter the recommendation algorithm on the fly, by changing how much weight to put on each characteristic. </p>
+
+<p> 
+The search algorithm is relatively simple, with FourSquare doing much of the heavy lifting.  It first loads the seed restaurant's venue and stores its tags (if no tags exist then the restaurant’s category will be used instead).  It then calls the venue explore endpoint (limit 10 results) and query's each of the tags, building a list of unique restaurants.  </p>
+
+Each restaurant is then scored by the following:
+<ul>
+<li>Distance From Location.  Score 1-5 (5 = less then 0.25 miles away, 1 = greater then 2 miles away)</li>
+<li>Difference in Price Tier.  Score 0-3 (0 = same price tier, 3 = Max Dif between price tiers)</li>
+<li>Phrase Matches.  Score 5-unlimited (Number of times the restaurant appeared when querying the seed restaurant's tags *5)</li>
+</ul>	
+</p>
+
+<p>These scores are then added together and the top 10 (or less) restaurants are displayed in the web app.  It is important to note that many phrase matches is the best way to get into the final 10.  Once in the web app javascript draws the results on the canvas based on the user's slide input. </p>
+
+
+<script>
+function draw() {
+	var c=document.getElementById("myCanvas");
+	var ctx=c.getContext("2d");
+
+	ctx.canvas.width  = 800;
+	ctx.canvas.height = 400;
+	var myText= "test me";
+	ctx.font = "12px sans-serif";
+
+	ctx.fillText("Worst Fit Results", 10, 10);
+	ctx.fillText("Best Fit Results", 10, ctx.canvas.height-10);
+	ctx.beginPath();
+	ctx.moveTo(20, 20);
+	ctx.lineTo(20, ctx.canvas.height-20);
+	ctx.stroke();
+	ctx.closePath();
+
+	var seedName = {{seedName|safe}};
+	var restaurantList = {{resultList|safe}};
+	var padding = 50;
+	var centerHeight = ctx.canvas.height-padding;
+	var centerWidth = ctx.canvas.width/2;
+
+	var minImpact = 10000;
+	var maxImpact =0;
+
+	for (var i=0;i<restaurantList.length;i++)
+	{ 
+		var distWeight = document.getElementById('distValue').value;
+		var priceWeight = document.getElementById('priceValue').value;
+		var phraseWeight = document.getElementById('phraseValue').value;
+
+		var distImpact = restaurantList[i]["distScore"] * distWeight * 5;
+		var priceImpact = restaurantList[i]["priceScore"] * priceWeight * 10;
+		var phraseImpact = restaurantList[i]["phraseScore"] * phraseWeight * 10;
+
+		var totalImpact = distImpact + priceImpact +  phraseImpact;
+
+		restaurantList[i]["totalImpact"] = totalImpact
+
+		if (totalImpact > maxImpact) {maxImpact=totalImpact;}
+		if (totalImpact < minImpact) {minImpact =totalImpact;}
+	}
+
+	var scaler = (centerHeight-50)/(maxImpact - minImpact);
+
+	for (var i=0;i<restaurantList.length;i++)
+	{ 
+		var elemWidth = padding + ((ctx.canvas.width-padding*2)/(restaurantList.length-1))*i;
+		var elemHeight = (restaurantList[i]["totalImpact"]-minImpact)*scaler;
+
+		ctx.beginPath();
+		ctx.setLineDash([5]);
+		ctx.moveTo(centerWidth,centerHeight);
+		ctx.lineTo(elemWidth, elemHeight+35);
+		ctx.strokeStyle = '#eee';
+		ctx.stroke();
+
+		ctx.fillText(restaurantList[i]["name"], elemWidth-25, elemHeight+25);
+	}
+
+	ctx.fillText(seedName, centerWidth-25, centerHeight+10);
+}
+
+function clearCanvas () {
+	var c=document.getElementById("myCanvas");
+	var ctx=c.getContext("2d");
+	ctx.clearRect (0, 0, ctx.canvas.width, ctx.canvas.height);
+}
+
+function drawViz() {
+	clearCanvas()
+	draw()
+}
+
+
+</script>
+
+
+</body>
+</html>

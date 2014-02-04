@@ -2,12 +2,8 @@ import foursquare
 import random
 from math import *
 
-def main():
-    restID = '4c2a81398abca59393c8fe1f'
-    restID = '4b3a3bc8f964a520b06225e3'
-    getExploreRestaurants(restID)
-
 def getExploreRestaurants(restID):
+    #builds results, location needs to be made dynamic
     client = getFSClient()
     seedRest = client.venues(restID)['venue']
     seedLat = seedRest['location']['lat']
@@ -19,6 +15,7 @@ def getExploreRestaurants(restID):
     seedTags = seedRest['tags']
     seedCat = seedRest['categories'][0]['name']
 
+    #defines paramters for the explore query
     exploreParams = {
         'll' :'40.73,-73.98',
         'radius' : 1000,
@@ -27,6 +24,7 @@ def getExploreRestaurants(restID):
         'query' : ''
         }
 
+    #builds a unique list of results from iterating over tags and querying fs
     resultList = {}
     if seedTags == [] :
         seedTags=[seedCat]
@@ -49,7 +47,9 @@ def getExploreRestaurants(restID):
     countme = 1
     tinyResult = []
     maxScore = 0
-    
+
+    #Scores results and makes a smaller list of scores and venue name
+    #new list is ordered by total score
     for x in resultList.keys():
         tempDict= {}
         targetLat = resultList[x]['location']['lat']
@@ -70,7 +70,7 @@ def getExploreRestaurants(restID):
             'name' : resultList[x]['name'],
             'priceScore' : resultList[x]['rvPriceScore'],
             'distScore' : resultList[x]['rvDistScore'],
-            'catScore' : resultList[x]['rvScore'],
+            'phraseScore' : resultList[x]['rvScore'],
             'totalScore' : resultList[x]['rvTotalScore']}
 
         insertIndex = 0
@@ -83,11 +83,11 @@ def getExploreRestaurants(restID):
 
         tinyResult.insert(insertIndex, tempDict)
 
-    #simple
+    #limits the results to the top 10 as per score and shuffles
     if len(tinyResult) > 10:
-        tinyResult = tinyResult[:10]
-        
+        tinyResult = tinyResult[:10]       
     random.shuffle(tinyResult)
+    
     return [seedRest['name'], tinyResult]
 
 def distanceLL(lon1, lat1, lon2, lat2):
@@ -104,6 +104,7 @@ def distanceLL(lon1, lat1, lon2, lat2):
     return 3961 * c
 
 def distanceScore(distance):
+    #creates a bucketed score based on distance
     if distance < 0.25:
         output = 5
     elif distance < 0.5:
@@ -118,12 +119,10 @@ def distanceScore(distance):
     return output
 
 def getFSClient():
+    #gets a foursquare client need to store the token better
     clientID = '5UAC11MZ4H4TRPKPIBFXSSU0BLFWUJDK1VVERD3HMEARU1BF'
     clientCode = 'VBX3IFJNEH4FFPL3JBR3BTAHGTTMHZVTUQHBQKIZBSNYW2MX'
     client = foursquare.Foursquare(client_id=clientID, client_secret=clientCode, redirect_uri='http://fondu.com/oauth/authorize')
     auth_uri = client.oauth.auth_url()
     return client
 
-    
-if __name__ == '__main__' :
-    main()
