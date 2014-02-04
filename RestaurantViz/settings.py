@@ -15,6 +15,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(__file__))
 
 TEMPLATE_DIRS = (
     '/Users/kelscott/Documents/DjangoProjects/RestaurantViz/RestaurantViz/Templates',
+    '/home/ubuntu/srv/RestaurantViz/RestaurantViz/Templates'
 )
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/1.6/howto/deployment/checklist/
