@@ -93,7 +93,9 @@ function draw() {
 		var elemHeight = (restaurantList[i]["totalImpact"]-minImpact)*scaler;
 
 		ctx.beginPath();
-		ctx.setLineDash([5]);
+		try {
+    			ctx.setLineDash([5]);
+		} catch (e) {}
 		ctx.moveTo(centerWidth,centerHeight);
 		ctx.lineTo(elemWidth, elemHeight+35);
 		ctx.strokeStyle = '#eee';
