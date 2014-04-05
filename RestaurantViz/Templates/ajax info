@@ -1,0 +1,21 @@
+$(document).ready(function(){
+  $("#ajaxMe").click(function(){
+	alert("Hit");
+	var userloc = $("#userLoc").val();
+	$.ajax({
+		url : "ajaxLoc",
+		type: "POST",
+		dataType : "json",
+		data : {client_response : userloc,
+			csrfmiddlewaretoken : '{{ csrf_token }}'
+			}
+		success : function(json) {
+			alert("DATA BACK : " + json.server_response);
+
+		error : function(xhr,errmsg,err) {
+				alert(xhr.status + ": " + xhr.responseText);
+			}
+		});
+	return false;
+	});
+});

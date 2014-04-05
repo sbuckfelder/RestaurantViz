@@ -2,8 +2,6 @@ import foursquare
 import random
 from math import *
 from geopy import geocoders
-from django.db import models
-    
 
 class restRanker():
     def __init__(self):

@@ -2,12 +2,61 @@
 <html>
 <head>
 	<title> Restaurant Visualization </title>
-	<style type = “text/css”>
-		canvas {border: 2px solid black;}
+	<style>
+		#myCanvas {border: 2px solid black;}
+
+		#locationDiv {
+			border : 2px solid black;
+			border-top:	none;
+			width : 800px;
+			height : 450px;
+		}
+
+		#restSearchDiv {
+			border : 2px solid black;
+			border-top:	none;
+			width : 800px;
+			min-height : 100px;
+			height : auto;
+		}
+
+		div.expandBanner { 
+			border : 2px solid black;
+			background-color: WHITE; 
+			width: 800px; 
+			height : 30px;
+			line-height: 30px;
+			text-align: left; 
+			display: inline-block;	
+		}
+
+		div.searchResult { 
+			border : 1px solid grey;
+			background-color: WHITE; 
+			border-top: none;
+			border-left : none;
+			border-right : none;
+			width: 800px; 
+			height : 30px;
+			line-height: 30px;
+			text-align: left; 
+			display: inline-block;	
+		}
+
+		centerText {
+			display: inline-block;
+			vertical-align: middle;    
+		}
+
+		#mapCanvas{
+			height : 400px;
+			width: 400px;
+		}
+
 	</style>
 </head>
 
-<body onload="drawViz()">
+<body onload="__init__()">
 
 <h1>Restaurant Visualization Tool</h1>
 <hr>
@@ -22,6 +71,32 @@ Phrase: <input type="range" name="phraseValue" id = "phraseValue" min="1" max="5
 </form>
 <p> Powered By <font color =#0cbadf>FourSquare</font> </p>
 <hr>
+
+<div id="locationBanner" class = "expandBanner">
+	<centerText> Seed Location (<locDis id = "LocDisplay"> Hide </locDis>)</centerText>
+</div>
+
+<div id="locationDiv">
+	<input type="text" id = "userLoc"/> {% csrf_token %}
+	<button id="updateLoc"> Update Location</button>
+	<locString id = "locString"> aa </locString>
+	<div id = "mapCanvas"> </div> 
+</div>
+
+<br><br>
+
+<div id="restSearchBanner" class = "expandBanner">
+	<centerText> Seed Restaurant (<locDis id = "restSearchDisplay"> Hide </locDis>)</centerText>
+</div>
+
+<div id = "restSearchDiv">
+	<input type="text" id = "userRestSearchStr"/> {% csrf_token %}
+	<input type="text" id = "userRestSearchLoc"/> 
+	<button id="updateRestSearch">	Search for New Restaurant Seed</button>
+	<div id ="restSearchResults">
+	</div>
+</div>
+
 <p> This is a simple web application that uses a seed restaurant (Currently hard coded as Xi'an Famous Foods, NYC St. Marks) and location to find other similar restaurants.  The slide tools allow the user to alter the recommendation algorithm on the fly, by changing how much weight to put on each characteristic. </p>
 
 <p> 
@@ -39,9 +114,188 @@ Each restaurant is then scored by the following:
 
 <a href="https://github.com/sbuckfelder/RestaurantViz">Code</a> on GitHub
 
+<script type='text/javascript' src='http://code.jquery.com/jquery-1.8.2.js'></script>
+<script src="http://maps.googleapis.com/maps/api/js?key=AIzaSyDopSOyAm4b523nUMdTs3NU-YHrFWwZbYw&sensor=false">
+</script>
 
 <script>
+SEED_FSID = "";
+SEED_RESTAURANT = "";
+REST_LIST = [];
+LOCATION = {};
+LOC_SHOW = true;
+REST_SEARCH_SHOW = true;
+
+var locBanner = document.getElementById('locationBanner');
+var restSearchBanner = document.getElementById('restSearchBanner');
+var googleMap = new google.maps.Map(document.getElementById("mapCanvas"));
+
+
+locBanner.onclick = function() {
+	if (LOC_SHOW == true) {
+		document.getElementById('LocDisplay').innerHTML = " Show ";
+		$("#locationDiv").hide();
+		LOC_SHOW = false;
+	}
+	else {
+		document.getElementById('LocDisplay').innerHTML = " Hide ";
+		$("#locationDiv").show();
+		LOC_SHOW = true;
+		setLocDiv();
+
+	}
+}
+
+restSearchBanner.onclick = function() {
+	if (REST_SEARCH_SHOW == true) {
+		document.getElementById('restSearchDisplay').innerHTML = " Show ";
+		$("#restSearchDiv").hide();
+		REST_SEARCH_SHOW = false;
+	}
+	else {
+		document.getElementById('restSearchDisplay').innerHTML = " Hide ";
+		$("#restSearchDiv").show();
+		REST_SEARCH_SHOW = true;
+	}
+}
+
+$(document).ready(function(){
+  $("#updateLoc").click(function(){
+  	clearCanvas();
+	var userloc = $("#userLoc").val();
+	$.ajax({
+		url : "RestaurantViz",
+		type : "POST",
+		dataType : "json",
+		data : {user_location : userloc,
+				seedID : SEED_FSID,
+			csrfmiddlewaretoken : '{{ csrf_token }}'},
+		success : function(json) {
+			SEED_RESTAURANT = json.seedName;
+			REST_LIST = json.resultList;
+			LOCATION = json.location;
+			setLocDiv();
+			draw();
+		},
+		error : function(xhr,errmsg,err) {
+			alert(err);
+		}
+		});
+		return false;
+	});
+
+  $("#updateRestSearch").click(function(){
+	var userSearchStr = $("#userRestSearchStr").val();
+	var userSearchLoc = $("#userRestSearchLoc").val();
+	$.ajax({
+		url : "RestaurantViz",
+		type : "POST",
+		dataType : "json",
+		data : {restSearch : userSearchStr,
+				restSearchLoc : userSearchLoc,
+				csrfmiddlewaretoken : '{{ csrf_token }}'},
+		success : function(json) {
+			searchResults = json.searchResults;
+			updateSearchResults(searchResults);
+		},
+		error : function(xhr,errmsg,err) {
+			alert(err);
+		}
+		});
+		return false;
+	});
+
+
+
+});
+
+function __init__() {
+	SEED_RESTAURANT = {{seedName|safe}};
+	SEED_FSID = {{seedID|safe}};
+	REST_LIST = {{resultList|safe}};
+	LOCATION = {{location|safe}};
+	draw();
+	locBanner.click();
+	setLocDiv();
+	restSearchBanner.click();
+}
+
+function updateSearchResults(resultList) {
+	var startDiv = document.getElementById('restSearchResults');
+	if (document.getElementById('tempDiv')) { 
+		startDiv.removeChild(document.getElementById('tempDiv'));
+	}
+	var tempDiv = document.createElement('div');
+	tempDiv.setAttribute('id', 'tempDiv');
+	var headerDiv = document.createElement('div');
+	headerDiv.innerHTML = 'You have ' + resultList.length + ' results.  Click on restaurant to update seed.';
+	tempDiv.appendChild(headerDiv)
+	for (var i =0; i<resultList.length; i++) {
+		var newDiv = getResultDiv(resultList[i], 'result' + i);
+		tempDiv.appendChild(newDiv);
+	}
+	startDiv.appendChild(tempDiv);
+}
+
+function getResultDiv(result, divName) { 
+	var newDiv = document.createElement('div');
+	newDiv.setAttribute('id', divName);
+	newDiv.setAttribute('class', 'searchResult');
+	var callText = "setSeedRestaurant(" + result['idFS'] + ")" ;
+	newDiv.onclick =  function() {setSeedRestaurant(result['idFS']);};
+	newDiv.innerHTML = '     ' + result['name'] + '   (' + result['address'] + ')';
+	return newDiv;
+}
+
+function setSeedRestaurant(fourSquareID){
+	clearCanvas();
+	$.ajax({
+		url : "RestaurantViz",
+		type : "POST",
+		dataType : "json",
+		data : {updateRest : fourSquareID,
+				userLoc : LOCATION['ll'],
+			csrfmiddlewaretoken : '{{ csrf_token }}'},
+		success : function(json) {
+			SEED_RESTAURANT = json.seedName;
+			SEED_FSID = json.seedID;
+			REST_LIST = json.resultList;
+			LOCATION = json.location;
+			setLocDiv();
+			draw();
+		},
+		error : function(xhr,errmsg,err) {
+			alert(err);
+		}
+	});
+	return false;
+}
+
+function init_map(){
+	var mapCenter = new google.maps.LatLng(LOCATION['lat'], LOCATION['lng']);
+	var mapParams = {
+			center : mapCenter,
+			zoom : 12
+	};
+	
+	googleMap.setOptions(mapParams);
+	var marker = new google.maps.Marker({
+		position : mapCenter,
+		map : googleMap,
+		title : 'Test'
+	});
+	google.maps.event.trigger(googleMap, 'resize');
+	googleMap.setCenter(mapCenter);
+}
+
+function setLocDiv() { 
+	document.getElementById('locString').innerHTML = 'Seed Address = ' + LOCATION['address'];
+	init_map();
+}
+
 function draw() {
+	var restaurantList = REST_LIST;
+	var seedName = SEED_RESTAURANT;
 	var c=document.getElementById("myCanvas");
 	var ctx=c.getContext("2d");
 
@@ -58,8 +312,6 @@ function draw() {
 	ctx.stroke();
 	ctx.closePath();
 
-	var seedName = {{seedName|safe}};
-	var restaurantList = {{resultList|safe}};
 	var padding = 50;
 	var centerHeight = ctx.canvas.height-padding;
 	var centerWidth = ctx.canvas.width/2;
@@ -117,6 +369,15 @@ function drawViz() {
 	clearCanvas()
 	draw()
 }
+
+function ajaxTest() {
+	$(document).ready(function(){
+		$("ajaxMe").click(function(){
+			alert("TESTing JQuery");
+		});
+	});
+}
+
 
 
 </script>
